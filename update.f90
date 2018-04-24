@@ -1,4 +1,4 @@
-!One propagation in update, include GS,pop control
+!One propagation in update, includes GS,pop control
 subroutine one_propagation(i_pop,i_GS)
 use mc_loop_param
 use method_param
