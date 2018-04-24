@@ -23,7 +23,6 @@ integer,intent(INOUT)::i_pop,i_GS
    end if
  end if
 
-
  !Do periodically population control and adjust ET
  !If crn.GT.0.d0  do modified gs
  if(i_pop.EQ.PopContrlstep) then

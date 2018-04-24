@@ -634,7 +634,7 @@ integer::k,m,n
    dlogw(i)=dlogw(i)+dlog(prefac*0.5d0)
 
 
-   !Choose the auxiliary flied.
+   !Choose the auxiliary field.
     if(fR(1)/prefac.ge.rndm()) then
       aux=1
       x=1.d0
