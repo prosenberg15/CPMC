@@ -735,9 +735,9 @@ end subroutine single_U_phi
 
 
 !-----------------------------------------
-!update exp_Vperpj to the wave function i
+!update exp_Vperp_jl to the wave function i
 !-----------------------------------------
-subroutine single_Vperp_phi(i,j,inver)
+subroutine single_Vperp_phi(i,j,l,inver)
 use param
 use rand_num
 use phi_param
@@ -748,17 +748,19 @@ use project_param
 use method_param
 use mpi_serial_param
 implicit none
-integer,intent(IN)::i,j
+integer,intent(IN)::i,j,l
 complex(kind=8),intent(INOUT)::inver(Ntot,Ntot,Dtot)
 complex(kind=8)::tot_weig
+complex(kind=8)::explrNNperp_up,explrNNperp_dn
 complex(kind=8)::nj(2,2,Dtot)
 complex(kind=8)::rat_l,rat_h(2),ratio(2)!Used to update the weight
 real(kind=8)::fR(2),prefac
 complex(kind=8)::um(Ntot,2,Dtot),vm(2,Ntot,Dtot)
+complex(kind=8)::um_NN(2,Ntot,2,Dtot),vm_NN(2,2,Ntot,Dtot)
 real(kind=8)::x
 real(kind=8)::p(2),Normp
 complex(kind=8)::r(2)
-integer::aux
+integer::aux,site_list(2)
 integer::k,m,n
 
 
@@ -768,23 +770,41 @@ integer::k,m,n
     call mystop
  else
 
-   !Get the um and vm, i is a walker, j is a basis element
-   call get_um_vm(i,j,um,vm,inver)
+    !Get the um and vm, i is a walker, j is for up-site, l is for dn-site
+    call get_um_vm_NNperp(i,j,l,um,vm,inver)
 
-   !get the green's function matrix nj(2,2,Dtot)
-   call get_green_matrix(um,vm,nj)
+    !get the green's function matrix nj(2,2,Dtot) (i.e. G^{sigma,sigma'}_ii)
+    call get_green_matrix_NN(um,vm,nj)
+
+    !get green's function matrix for nearest-neighbor
+    !hopping (i.e. G^{sigma,sigma'}_ij)
+    !call get_green_matrix(um,vm,nij)
+  
+    !Get two possible new tot_imp
+    rat_l=tot_imp(i)
+    do m=1,2,1
+       rat_h(m)=zero
+       do k=1,Dtot,1
+          rat_h(m)=rat_h(m)+conjg(coe_multi(k))*impfunc(k,i)  &
+               & *(explnNNperp_up(m)*explnNNperp_dn(m)*(nj(1,1,k)* &
+               & nj(2,2,k)-nj(,1,2,k)*nj(,2,1,k))  &
+               & +explnNNperp_up(m)*nj(1,1,k)+explnNNperp_dn(m)* &
+               & nj(2,2,k)+one)
+       end do
+       ratio(m)=rat_h(m)/rat_l
+    end do
 
    !Get two possible new tot_imp
-   rat_l=tot_imp(i)
-   do m=1,2,1
-      rat_h(m)=zero
-      do k=1,Dtot,1
-         rat_h(m)=rat_h(m)+conjg(coe_multi(k))*impfunc(k,i)  &
-                 & *(expln_up(m)*expln_dn(m)*(nj(1,1,k)*nj(2,2,k)-nj(1,2,k)*nj(2,1,k))  &
-                 & +expln_up(m)*nj(1,1,k)+expln_dn(m)*nj(2,2,k)+one)
-      end do
-      ratio(m)=rat_h(m)/rat_l
-   end do
+   !rat_l=tot_imp(i)
+   !do m=1,2,1
+   !   rat_h(m)=zero
+   !   do k=1,Dtot,1
+   !      rat_h(m)=rat_h(m)+conjg(coe_multi(k))*impfunc(k,i)  &
+   !              & *(expln_up(m)*expln_dn(m)*(nj(1,1,k)*nj(2,2,k)-nj(1,2,k)*nj(2,1,k))  &
+   !              & +expln_up(m)*nj(1,1,k)+expln_dn(m)*nj(2,2,k)+one)
+   !   end do
+   !   ratio(m)=rat_h(m)/rat_l
+   !end do
    
    !Update the total normalization factor
    if(dcp.eq.'S') then
@@ -796,7 +816,7 @@ integer::k,m,n
      !We need another weight change for the density HS transformation
      do k=1,2,1
        !fR(k)=dble(ratio(k))
-        fR(k)=dble(ratio(k)*exp(dt*OnsitU/2.d0-dble(gama)*dble((-1)**k)))
+        fR(k)=dble(ratio(k)*exp(dt*Vperp/2.d0-dble(gama_perp)*dble((-1)**k)))
         if(fR(k).le.0.d0) fR(k)=0.d0
      end do
    end if
@@ -826,14 +846,14 @@ integer::k,m,n
     end if
 
 
-    explr_up=expln_up(aux)
-    explr_dn=expln_dn(aux)
+    explrNNperp_up=explnNNperp_up(aux)
+    explrNNperp_dn=explnNNperp_dn(aux)
 
 
    !Change the impfunction.
    do k=1,Dtot,1
-      impfunc(k,i)=impfunc(k,i)*(expln_up(aux)*expln_dn(aux)*(nj(1,1,k)*nj(2,2,k)-nj(1,2,k)*nj(2,1,k))  &
-                 & +expln_up(aux)*nj(1,1,k)+expln_dn(aux)*nj(2,2,k)+one)
+      impfunc(k,i)=impfunc(k,i)*(explnNNperp_up(aux)*explnNNperp_dn(aux)*(nj(1,1,k)*nj(2,2,k)-nj(1,2,k)*nj(2,1,k))  &
+                 & +explnNNperp_up(aux)*nj(1,1,k)+explnNNperp_dn(aux)*nj(2,2,k)+one)
    end do
    tot_imp(i)=rat_h(aux)
 
@@ -841,41 +861,13 @@ integer::k,m,n
      !Get inverse of the overlap
      do k=1,Dtot,1
 
-        !old code
-        !!Get the inv(2,2)
-        !inv(1,1)=one+expln_up(aux)*nj(1,1,k)
-        !inv(1,2)=expln_up(aux)*nj(2,1,k)
-        !inv(2,1)=expln_dn(aux)*nj(1,2,k)
-        !inv(2,2)=one+expln_dn(aux)*nj(2,2,k)
-        !call inv2(inv(1,1))
-        ! 
-        !!Get vm(2,Ntot)
-        !do m=1,Ntot,1
-        !   vm(1,m)=phi(j,m,i)*expln_up(aux)
-        !   vm(2,m)=phi(j+Nsite,m,i)*expln_dn(aux)
-        !end do 
-        ! 
-        !!Get um(Ntot,2)
-        !um(1:Ntot,1)=Conjg(phiT(j,1:Ntot,k))
-        !um(1:Ntot,2)=Conjg(phiT(j+Nsite,1:Ntot,k))
-        !
-        !!tmp=inv.vm
-        !call zgemm('N','N',2,Ntot,2,one,inv(1,1),2,vm(1,1),2,zero,tmp(1,1),2)
-        !!tmp_p=um.tmp
-        !call zgemm('N','N',Ntot,Ntot,2,one,um(1,1),Ntot,tmp(1,1),2,zero,tmp_p(1,1),Ntot)
-        !!tmp_pp=tmp_p.inver
-        !call zgemm('N','N',Ntot,Ntot,Ntot,one,tmp_p(1,1),Ntot,inver(1,1,k),Ntot,zero,tmp_pp(1,1),Ntot)
-        !!inver-inver.tmp_pp
-        !call zcopy(Ntot*Ntot,inver(1,1,k),1,tmp_p(1,1),1)
-        !call zgemm('N','N',Ntot,Ntot,Ntot,(-1.d0,0.d0),tmp_p(1,1),Ntot,tmp_pp(1,1),Ntot,one,inver(1,1,k),Ntot)
-
-        call update_inverse(i,j,k,nj(1,1,k),aux,um(1,1,k),vm(1,1,k),inver(1,1,k))
+        call update_inverse_Vperp(i,j,k,nj(1,1,k),aux,um(1,1,k),vm(1,1,k),inver(1,1,k))
         
      end do
    else if(j.eq.Nsite) then
      !We do not need to update the inverse
    else
-     write(*,*) "Something is wrong with the onsit j input:",j
+     write(*,*) "Something is wrong with the onsite j input:",j
      call mystop
    end if
 
@@ -888,21 +880,13 @@ integer::k,m,n
  end if
 
 
-!get the new determinate
- if(dtype.EQ.'c') then
-   do k=1,Ntot,1
-      phi(j,k,i)=phi(j,k,i)*(explr_up+one)
-      phi(j+Nsite,k,i)=phi(j+Nsite,k,i)*(explr_dn+one)
-   end do
- else if(dtype.EQ.'d') then
-   do k=1,Nspin(1),1
-      phi(j,k,i)=phi(j,k,i)*(explr_up+one)
-   end do
-   do k=Nspin(1)+1,Ntot,1
-      phi(j+Nsite,k,i)=phi(j+Nsite,k,i)*(explr_dn+one)
-   end do
- end if
-
+!get the new determinant
+ do k=1,Nspin(1),1
+    phi(j,k,i)=phi(j,k,i)*(explrNNperp_up+one)
+ end do
+ do k=Nspin(1)+1,Ntot,1
+    phi(j+Nsite,k,i)=phi(j+Nsite,k,i)*(explrNNperp_dn+one)
+ end do
 
 !test
 ! if(i.eq.1050) then
@@ -914,6 +898,213 @@ integer::k,m,n
 !end test
 
 end subroutine single_Vperp_phi
+
+!-----------------------------------------
+!update exp_Vpar_jl to the wave function i
+!-----------------------------------------
+subroutine single_Vpar_phi(i,j,l,inver)
+use param
+use rand_num
+use phi_param
+use model_param
+use lattice_param
+use phiT_param
+use project_param
+use method_param
+use mpi_serial_param
+implicit none
+integer,intent(IN)::i,j,l
+complex(kind=8),intent(INOUT)::inver(Ntot,Ntot,Dtot)
+complex(kind=8)::tot_weig
+complex(kind=8)::explrNNpar_up,explrNNpar_dn
+complex(kind=8)::nj(2,2,Dtot)
+complex(kind=8)::rat_l,rat_h(2,2),ratio(2,2)!Used to update the weight
+real(kind=8)::fR(2),prefac
+complex(kind=8)::um(Ntot,2,Dtot),vm(2,Ntot,Dtot)
+complex(kind=8)::um_NN(2,Ntot,2,Dtot),vm_NN(2,2,Ntot,Dtot)
+real(kind=8)::x
+real(kind=8)::p(2),Normp
+complex(kind=8)::r(2)
+integer::aux,site_list(2)
+integer::k,m,n
+
+
+!Get the update explr_up and explr_dn with update the weight.
+ if(crn.GT.0.d0) then
+    write(*,*) 'Free projection not supported with nearest-neighbor potentials'
+    call mystop
+ else
+
+    !first loop --> spin-up, second loop --> spin-down
+    do sigma = 1, 2, 1
+
+       !Get two possible new tot_imp
+       if(sigma.eq.1) then
+
+          !Get the um and vm, i is a walker, j is for up-site, l is for dn-site
+          call get_um_vm_NNpar(i,j,l,um,vm,inver,sigma)
+
+          !get green's function matrix for nearest-neighbor
+          !hopping (i.e. G^{sigma,sigma'}_ij)
+          call get_green_matrix_NNpar(um,vm,nj,sigma)
+
+          rat_l=tot_imp(i)
+          do m=1,2,1
+             rat_h(m)=zero
+             do k=1,Dtot,1
+                rat_h(m)=rat_h(m)+conjg(coe_multi(k))*impfunc(k,i)  &
+                     & *(explnNNpar_up(1,m)*explnNNpar_up(2,m)*nj(1,1,k)* &
+                     & nj(2,2,k)+explnNNpar_up(1,m)*nj(1,1,k)+explnNNpar_up(2,m)* &
+                     & nj(2,2,k)+one-explnNNpar_up(2,m)*nj(2,1,k)* &
+                     & explnNNpar_up(1,m)*nj(1,2,k))
+             end do
+             ratio(m)=rat_h(m)/rat_l
+          end do
+
+       else
+
+          !Get the um and vm, i is a walker, j is for up-site, l is for dn-site
+          call get_um_vm_NNpar(i,j,l,um,vm,inver,sigma)
+
+          !get green's function matrix for nearest-neighbor
+          !hopping (i.e. G^{sigma,sigma'}_ij)
+          call get_green_matrix_NNpar(um,vm,nij,sigma)
+
+          do m=1,2,1
+             do k=1,Dtot,1
+                rat_h(m)=rat_h(m)+conjg(coe_multi(k))*impfunc(k,i) &
+                     & *(explnNNpar_dn(1,m)*explnNNpar_dn(2,m)*nj(1,1,k)* &
+                     & nj(2,2,k)+explnNNpar_dn(1,m)*nj(1,1,k)+explnNNpar_dn(2,m)* &
+                     & nj(2,2,k)+one-explnNNpar_dn(2,m)*nj(2,1,k)* &
+                     & explnNNpar_dn(1,m)*nj(1,2,k))
+             end do
+             ratio(m)=rat_h(m)/rat_l
+          end do
+
+       endif
+
+       !Update the total normalization factor
+       if(dcp.eq.'S') then
+          do k=1,2,1
+             fR(k)=dble(ratio(k)) 
+             if(fR(k).le.0.d0) fR(k)=0.d0  !We can add mirror correction here. 
+          end do
+       else if(dcp.eq.'C') then
+          !We need another weight change for the density HS transformation
+          do k=1,2,1
+       !fR(k)=dble(ratio(k))
+             fR(k)=dble(ratio(k)*exp(dt*Vpar/2.d0-dble(gama_par)*dble((-1)**k)))
+             if(fR(k).le.0.d0) fR(k)=0.d0
+          end do
+       end if
+
+       prefac=fR(1)+fR(2) !normalization factor,No the true normalization.Need to
+                          !multipuly 0.5
+
+       if(prefac.le.0.d0) then
+          weight(i)=0.d0
+          dlogw(i)=-1d100
+          return
+       end if
+
+       weight(i)=weight(i)*prefac*0.5d0   !We must mutipuly 0.5d0 here so that 
+                                          !the weight will not grow up too
+                                          !large ... no it is p(x) from HS
+       dlogw(i)=dlogw(i)+dlog(prefac*0.5d0)
+
+
+   !Choose the auxiliary field.
+    if(fR(1)/prefac.ge.rndm()) then
+      aux=1
+      x=1.d0
+    else
+      aux=2
+      x=2.d0
+    end if
+
+    if(sigma.eq.1) then
+       explrNNpar_up=explnNNpar_up(aux)
+    else
+       explrNNpar_dn=explnNNpar_dn(aux)
+    endif
+
+   !Change the impfunction.
+    if(sigma.eq.1) then
+       do k=1,Dtot,1
+          impfunc(k,i)=impfunc(k,i)*(explnNNpar_up(1,aux)*explnNNpar_up(2,aux)*nj(1,1,k)* &
+                     & nj(2,2,k)+explnNNpar_up(1,aux)*nj(1,1,k)+explnNNpar_up(2,aux)* &
+                     & nj(2,2,k)+one-explnNNpar_up(2,aux)*nj(2,1,k)* &
+                     & explnNNpar_up(1,aux)*nj(1,2,k))
+       end do
+       tot_imp(i)=rat_h(aux)
+    else
+       do k=1,Dtot,1
+          impfunc(k,i)=impfunc(k,i)*(explnNNpar_dn(1,aux)*explnNNpar_dn(2,aux)*nj(1,1,k)* &
+               & nj(2,2,k)+explnNNpar_dn(1,aux)*nj(1,1,k)+explnNNpar_dn(2,aux)* &
+               & nj(2,2,k)+one-explnNNpar_dn(2,aux)*nj(2,1,k)* &
+               & explnNNpar_dn(1,aux)*nj(1,2,k))
+       end do
+       tot_imp(i)=rat_h(aux)
+    end if
+
+    if(sigma.eq.1) then
+       if(j.LT.Nsite) then
+          !Get inverse of the overlap
+          do k=1,Dtot,1
+
+             call update_inverse_Vpar(i,j,k,nj(1,1,k),aux,um(1,1,k),vm(1,1,k),inver(1,1,k),sigma)
+        
+          end do
+       else if(j.eq.Nsite) then
+          !We do not need to update the inverse
+       else
+          write(*,*) "Something is wrong with the onsite j input:",j
+          call mystop
+       end if
+    else
+       if(j.LT.Nsite) then
+          !Get inverse of the overlap
+          do k=1,Dtot,1
+
+             call update_inverse_Vpar(i,j,k,nj(1,1,k),aux,um(1,1,k),vm(1,1,k),inver(1,1,k),sigma)
+        
+          end do
+       else if(j.eq.Nsite) then
+          !We do not need to update the inverse
+       else
+          write(*,*) "Something is wrong with the onsite j input:",j
+          call mystop
+       end if
+    end if
+
+!Store the propogation Ising spin for back propogation.
+! MUST UPDATE FOR NEAREST-NEIGHBOR INTERACTION
+ if(back_pro) then
+    back_store(j,i_back,i)=x
+ end if
+
+!get the new determinant
+if(sigma.eq.1) then
+   do k=1,Nspin(1),1
+      phi(j,k,i)=phi(j,k,i)*(explrNNpar_up+one)
+   end do
+else
+   do k=Nspin(1)+1,Ntot,1
+      phi(j+Nsite,k,i)=phi(j+Nsite,k,i)*(explrNNpar_dn+one)
+   end do
+endif
+
+end do
+!test
+! if(i.eq.1050) then
+!    write(*,*) tot_imp(i),i,j
+!    !write(*,*) inver(2,2,1) 
+!    call get_test(i)
+!    pause 
+! end if
+!end test
+
+end subroutine single_Vpar_phi
 
 !One propagation in update, includes GS,pop control
 subroutine one_propagation(i_pop,i_GS)
@@ -1652,7 +1843,7 @@ end subroutine single_U_phi
 
 !The vm and um arrays are useful in calculating the green's function and updating the inverse.
 !Here we set vm=(phi)_{j,1:Ntot}.Inverse, and the um=conjg(phiT(j,1:Ntot))
-subroutine get_um_vm(i,j,l,um,vm,inver)
+subroutine get_um_vm(i,j,um,vm,inver)
 use param
 use phiT_param
 use model_param
@@ -1660,7 +1851,7 @@ use lattice_param
 use project_param
 use phi_param
 implicit none
-integer,intent(IN)::i,j,l
+integer,intent(IN)::i,j
 complex(kind=8),intent(IN)::inver(Ntot,Ntot,Dtot)
 complex(kind=8),intent(OUT)::vm(2,Ntot,Dtot) 
 complex(kind=8),intent(OUT)::um(Ntot,2,Dtot)
@@ -1689,6 +1880,95 @@ else if(dtype.EQ.'d') then
 end if
 end subroutine get_um_vm
 
+!The vm and um arrays are useful in calculating the green's function and updating the inverse.
+!Here we set vm=(phi)_{j,1:Ntot}.Inverse, and the um=conjg(phiT(j,1:Ntot))
+subroutine get_um_vm_NNperp(i,j,l,um,vm,inver)
+use param
+use phiT_param
+use model_param
+use lattice_param
+use project_param
+use phi_param
+implicit none
+integer,intent(IN)::i,j,l
+complex(kind=8),intent(IN)::inver(Ntot,Ntot,Dtot)
+complex(kind=8),intent(OUT)::vm(2,Ntot,Dtot) 
+complex(kind=8),intent(OUT)::um(Ntot,2,Dtot)
+complex(kind=8)::vm_t(2,Ntot)
+integer::k
+
+!Get vm(2,Ntot)
+vm_t(1,1:Nspin(1))=phi(j,1:Nspin(1),i)
+vm_t(2,(Nspin(1)+1):Ntot)=phi(l+Nsite,(Nspin(1)+1):Ntot,i)
+do k=1,Dtot,1
+   call zgemv('T',Nspin(1),Nspin(1),one,inver(1,1,k),Ntot,vm_t(1,1),2,zero,vm(1,1,k),2)
+   call zgemv('T',Nspin(2),Nspin(2),one,inver((Nspin(1)+1),(Nspin(1)+1),k),Ntot,vm_t(2,(Nspin(1)+1)),2, &
+        zero,vm(2,(Nspin(1)+1),k),2)
+   um(1:Nspin(1),1,k)=Conjg(phiT(j,1:Nspin(1),k))
+   um((Nspin(1)+1):Ntot,2,k)=Conjg(phiT(l+Nsite,(Nspin(1)+1):Ntot,k))
+end do
+
+end subroutine get_um_vm_NNperp
+
+!The vm and um arrays are useful in calculating the green's function and updating the inverse.
+!Here we set vm=(phi)_{j,1:Ntot}.Inverse, and the um=conjg(phiT(j,1:Ntot))
+subroutine get_um_vm_NNpar(i,j,l,um,vm,inver,sigma)
+use param
+use phiT_param
+use model_param
+use lattice_param
+use project_param
+use phi_param
+implicit none
+integer,intent(IN)::i,j,l,sigma
+complex(kind=8),intent(IN)::inver(Ntot,Ntot,Dtot)
+!complex(kind=8),intent(OUT)::vm(2,Ntot,Dtot) 
+!complex(kind=8),intent(OUT)::um(Ntot,2,Dtot)
+complex(kind=8),allocatable,intent(OUT)::vm(:,:,:) 
+complex(kind=8),allocatable,intent(OUT)::um(:,:,:)
+complex(kind=8),allocatable::vm_t(:,:)
+!complex(kind=8)::vm_t(2,Ntot)
+integer::k
+
+!Get vm(2,Ntot)
+if(sigma.eq.1) then
+
+   allocate(vm(2,2*Nspin(1),Dtot))
+   allocate(um(2,2*Nspin(1),Dtot))
+   allocate(vm_t(2,2*Nspin(1)))
+
+   vm_t(1,1:Nspin(1))=phi(j,1:Nspin(1),i)
+   vm_t(2,(Nspin(1)+1):2*Nspin(1))=phi(l,1:Nspin(1),i)
+
+   do k=1,Dtot,1
+      call zgemv('T',Nspin(1),Nspin(1),one,inver(1,1,k),Ntot,vm_t(1,1),2,zero,vm(1,1,k),2)
+      call zgemv('T',Nspin(1),Nspin(1),one,inver(1,1,k),Ntot,vm_t(2,(Nspin(1)+1)),2, &
+           zero,vm(2,(Nspin(1)+1),k),2)
+      um(1:Nspin(1),1,k)=Conjg(phiT(j,1:Nspin(1),k))
+      um((Nspin(1)+1):2*Nspin(1),2,k)=Conjg(phiT(l,1:Nspin(1),k))
+   end do
+
+else if(sigma.eq.2) then
+
+   allocate(vm(2,2*Nspin(2),Dtot))
+   allocate(um(2,2*Nspin(2),Dtot))
+   allocate(vm_t(2,2*Nspin(2)))
+
+   vm_t(1,1:Nspin(2))=phi(j+Nsite,(Nspin(1)+1):Ntot,i)
+   vm_t(2,(Nspin(2)+1):2*Nspin(2))=phi(l+Nsite,(Nspin(1)+1):Ntot,i)
+
+   do k=1,Dtot,1
+      call zgemv('T',Nspin(2),Nspin(2),one,inver((Nspin(1)+1),(Nspin(1)+1),k),Ntot,vm_t(1,1),2,zero,vm(1,1,k),2)
+      call zgemv('T',Nspin(2),Nspin(2),one,inver((Nspin(1)+1),(Nspin(1)+1),k),Ntot,vm_t(2,(Nspin(2)+1)),2, &
+           zero,vm(2,(Nspin(1)+1),k),2)
+      um(1:Nspin(2),1,k)=Conjg(phiT(j+Nsite,(Nspin(1)+1):Ntot,k))
+      um((Nspin(2)+1):2*Nspin(2),2,k)=Conjg(phiT(l+Nsite,(Nspin(1)+1):Ntot,k))
+   end do
+
+endif
+
+end subroutine get_um_vm_NNpar
+
 
 !This subroutine get the green's function matrix from nj=Transpose(vm.um)
 subroutine get_green_matrix(um,vm,nj)
@@ -1715,6 +1995,54 @@ else if(dtype.EQ.'d') then
   end do
 end if
 end subroutine get_green_matrix
+
+
+!This subroutine get the green's function matrix from nj=Transpose(vm.um)
+subroutine get_green_matrix_NNperp(um,vm,nj)
+use param
+use model_param
+use phiT_param
+implicit none
+complex(kind=8),intent(IN)::vm(2,Ntot,Dtot)
+complex(kind=8),intent(IN)::um(Ntot,2,Dtot)
+complex(kind=8),intent(OUT)::nj(2,2,Dtot)
+complex(kind=8),external::zdotu
+integer::k
+
+do k=1,Dtot,1
+   nj(1,1,k)=zdotu(Nspin(1),vm(1,1,k),2,um(1,1,k),1)
+   nj(2,2,k)=zdotu(Nspin(2),vm(2,(Nspin(1)+1),k),2,um((Nspin(1)+1),2,k),1)
+   nj(1,2,k)=zero
+   nj(2,1,k)=zero 
+end do
+
+end subroutine get_green_matrix_NNperp
+
+!This subroutine get the green's function matrix from nj=Transpose(vm.um)
+! nj(1,1) = G^{sigma,sigma}_{jj}
+! nj(2,2) = G^{sigma,sigma}_{ll}
+! nj(1,2) = G^{sigma,sigma}_{jl}
+! nj(2,1) = G^{sigma,sigma}_{lj}
+subroutine get_green_matrix_NNpar(um,vm,nj,sigma)
+use param
+use model_param
+use phiT_param
+implicit none
+integer,intent(IN)        ::sigma
+complex(kind=8),intent(IN)::vm(2,2*Nspin(sigma),Dtot)
+complex(kind=8),intent(IN)::um(2*Nspin(sigma),2,Dtot)
+complex(kind=8),intent(OUT)::nj(2,2,Dtot)
+complex(kind=8),external::zdotu
+integer::k
+
+do k=1,Dtot,1
+      nj(1,1,k)=zdotu(Nspin(sigma),vm(1,1,k),2,um(1,1,k),1)
+      nj(2,2,k)=zdotu(Nspin(sigma),vm(2,(Nspin(sigma)+1),k),2,um((Nspin(sigma)+1),2,k),1)
+      nj(1,2,k)=zdotu(Nspin(sigma),vm(1,1,k),2,um((Nspin(sigma)+1),2,k),1)
+      nj(2,1,k)=zdotu(Nspin(sigma),vm(2,(Nspin(sigma)+1),k),2,um(1,1,k),1)
+end do
+
+end subroutine get_green_matrix_NNpar
 
 
 !Update the inverse matrix in single U to phi
@@ -1847,7 +2175,6 @@ else if(dtype.EQ.'d') then
   inv(1,1)=(-1.d0,0.d0)*expln_up(aux)/(one+expln_up(aux)*nj(1,1))
   inv(2,2)=(-1.d0,0.d0)*expln_dn(aux)/(one+expln_dn(aux)*nj(2,2))
 
-
   !tmp_um=inver.um
   call zgemv('N',Nspin(1),Nspin(1),one,inver(1,1),Ntot,um(1,1),1,zero,tmp_um(1,1),1)
   call zgemv('N',Nspin(2),Nspin(2),one,inver((Nspin(1)+1),(Nspin(1)+1)),Ntot,um((Nspin(1)+1),2),1, &
@@ -1860,15 +2187,97 @@ else if(dtype.EQ.'d') then
   call zgeru(Nspin(1),Nspin(1),inv(1,1),tmp_um(1,1),1,vm(1,1),2,inver(1,1),Ntot)
   call zgeru(Nspin(2),Nspin(2),inv(2,2),tmp_um(Nspin(1)+1,2),1,vm(2,Nspin(1)+1),2,inver(Nspin(1)+1,Nspin(1)+1),Ntot)
 
-
-  
-
   !write(*,*) "here";call mystop
 end if
 
 end subroutine update_inverse
 
 
+!Update the inverse matrix following application of single Vperp to phi
+subroutine update_inverse_Vperp(i,j,k,nj,aux,um,vm,inver)
+use param
+use rand_num
+use phi_param
+use model_param
+use lattice_param
+use phiT_param
+use project_param
+use method_param
+implicit none
+integer,intent(IN)::i,j,k,aux
+complex(kind=8),intent(IN)::nj(2,2)
+complex(kind=8),intent(IN)::um(Ntot,2),vm(2,Ntot)
+complex(kind=8),intent(INOUT)::inver(Ntot,Ntot)
+complex(kind=8)::inv(2,2)
+complex(kind=8)::tmp_vm(2,Ntot),tmp_um(Ntot,2)
+integer::m,n
+
+!Get the inv(2,2) with Diag(-expln_up(aux),-expln_dn(aux))
+inv(1,1)=(-1.d0,0.d0)*explnNNperp_up(aux)/(one+explnNNperp_up(aux)*nj(1,1))
+inv(2,2)=(-1.d0,0.d0)*explnNNperp_dn(aux)/(one+explnNNperp_dn(aux)*nj(2,2))
+
+!tmp_um=inver.um
+call zgemv('N',Nspin(1),Nspin(1),one,inver(1,1),Ntot,um(1,1),1,zero,tmp_um(1,1),1)
+call zgemv('N',Nspin(2),Nspin(2),one,inver((Nspin(1)+1),(Nspin(1)+1)),Ntot,um((Nspin(1)+1),2),1, &
+           & zero,tmp_um((Nspin(1)+1),2),1)
+
+!inver-inv(i,i).tmp_um.vm
+call zgeru(Nspin(1),Nspin(1),inv(1,1),tmp_um(1,1),1,vm(1,1),2,inver(1,1),Ntot)
+call zgeru(Nspin(2),Nspin(2),inv(2,2),tmp_um(Nspin(1)+1,2),1,vm(2,Nspin(1)+1),2,inver(Nspin(1)+1,Nspin(1)+1),Ntot)
+
+end subroutine update_inverse_Vperp
+
+!Update the inverse matrix following application of single Vpar to phi
+subroutine update_inverse_Vpar(i,j,k,nj,aux,um,vm,inver,sigma)
+use param
+use rand_num
+use phi_param
+use model_param
+use lattice_param
+use phiT_param
+use project_param
+use method_param
+implicit none
+integer,intent(IN)::i,j,k,aux,sigma
+complex(kind=8),intent(IN)::nj(2,2)
+complex(kind=8),intent(IN)::um(2*Nspin(sigma),2),vm(2,2*Nspin(sigma))
+complex(kind=8),intent(INOUT)::inver(Ntot,Ntot)
+complex(kind=8)::inv(2,2)
+complex(kind=8)::tmp_vm(2,Ntot),tmp_um(Ntot,2)
+integer::m,n
+
+!Get the inv(2,2) with Diag(-expln_up(aux),-expln_dn(aux))
+if(sigma.eq.1) then
+
+   inv(1,1)=(-1.d0,0.d0)*explnNNpar_up(aux)/(one+explnNNpar_up(aux)*nj(1,1))
+   inv(2,2)=(-1.d0,0.d0)*explnNNpar_up(aux)/(one+explnNNpar_up(aux)*nj(2,2))
+
+   !tmp_um=inver.um
+   call zgemv('N',Nspin(1),Nspin(1),one,inver(1,1),2*Nspin(1),um(1,1),1,zero,tmp_um(1,1),1)
+   call zgemv('N',Nspin(1),Nspin(1),one,inver(1,1),2*Nspin(1),um((Nspin(1)+1),2),1, &
+        & zero,tmp_um((Nspin(1)+1),2),1)
+
+   !inver-inv(i,i).tmp_um.vm
+   call zgeru(Nspin(1),Nspin(1),inv(1,1),tmp_um(1,1),1,vm(1,1),2,inver(1,1),Ntot)
+   call zgeru(Nspin(1),Nspin(1),inv(2,2),tmp_um(Nspin(1)+1,2),1,vm(2,Nspin(1)+1),2,inver(1,1),Ntot)
+
+else if(sigma.eq.2) then
+
+   inv(1,1)=(-1.d0,0.d0)*explnNNpar_dn(aux)/(one+explnNNpar_dn(aux)*nj(1,1))
+   inv(2,2)=(-1.d0,0.d0)*explnNNpar_dn(aux)/(one+explnNNpar_dn(aux)*nj(2,2))
+
+   !tmp_um=inver.um
+   call zgemv('N',Nspin(2),Nspin(2),one,inver((Nspin(1)+1),(Nspin(1)+1)),Ntot,um(1,1),1,zero,tmp_um(1,1),1)
+   call zgemv('N',Nspin(2),Nspin(2),one,inver((Nspin(1)+1),(Nspin(1)+1)),Ntot,um((Nspin(2)+1),2),1, &
+        & zero,tmp_um((Nspin(2)+1),2),1)
+
+   !inver-inv(i,i).tmp_um.vm
+   call zgeru(Nspin(2),Nspin(2),inv(1,1),tmp_um(1,1),1,vm(1,1),2,inver(Nspin(1)+1,Nspin(1)+1),Ntot)
+   call zgeru(Nspin(2),Nspin(2),inv(2,2),tmp_um(Nspin(2)+1,2),1,vm(2,Nspin(2)+1),2,inver(Nspin(1)+1,Nspin(1)+1),Ntot)
+
+end if
+
+end subroutine update_inverse_Vpar
 
 !test
 !subroutine get_test(k)

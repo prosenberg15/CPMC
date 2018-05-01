@@ -709,7 +709,7 @@ if(Nbands.eq.1)then
       !nearest-neighbor interaction (opposite spins)
       y=-1.d0*dt*Vperp/2.d0
       call get_gama(gama_perp,y)
-      !nearest-neighbor interactin (like spins)
+      !nearest-neighbor interaction (like spins)
       y=-1.d0*dt*Vpar/2.d0
       call get_gama(gama_par,y)
    else
@@ -737,12 +737,16 @@ if(Nbands.eq.1)then
       explnNNperp_dn(2)=exp(-1.d0*(dt*Vperp*0.5d0+gama_perp))-one
 
       !nearest-neighbor interaction (like spins)
-      explnNNpar_up(1)=exp(-1.d0*(dt*Vpar*0.5d0+gama_par))-one
-      explnNNpar_up(2)=exp(-1.d0*(dt*Vpar*0.5d0-gama_par))-one
+      explnNNpar_up(1,1)=exp(-1.d0*(dt*Vpar*0.5d0+gama_par))-one
+      explnNNpar_up(1,2)=exp(-1.d0*(dt*Vpar*0.5d0-gama_par))-one
+      explnNNpar_up(2,1)=exp(-1.d0*(dt*Vpar*0.5d0-gama_par))-one
+      explnNNpar_up(2,2)=exp(-1.d0*(dt*Vpar*0.5d0+gama_par))-one
 
-      explnNNpar_dn(1)=exp(-1.d0*(dt*Vpar*0.5d0-gama_par))-one
-      explnNNpar_dn(2)=exp(-1.d0*(dt*Vpar*0.5d0+gama_par))-one
-      
+      explnNNpar_dn(1,1)=exp(-1.d0*(dt*Vpar*0.5d0+gama_par))-one
+      explnNNpar_dn(1,2)=exp(-1.d0*(dt*Vpar*0.5d0-gama_par))-one
+      explnNNpar_dn(2,1)=exp(-1.d0*(dt*Vpar*0.5d0-gama_par))-one
+      explnNNpar_dn(2,2)=exp(-1.d0*(dt*Vpar*0.5d0+gama_par))-one
+
    else if(dcp.eq.'C') then
       !1 x=-1; 2 x=1
       !on-site interaction

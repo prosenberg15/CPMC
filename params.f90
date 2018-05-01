@@ -119,12 +119,16 @@ implicit none
  complex(kind=8),allocatable::exp_halfK(:,:)   ! 2*Nsite,2*Nsite.
  complex(kind=8),allocatable::exp_mhalfK(:,:)   ! 2*Nsite,2*Nsite.
  complex(kind=8),allocatable::exp_K(:,:)   ! 2*Nsite,2*Nsite.
- complex(kind=8)::gama      !the param used in H-S transforamtion.
+ complex(kind=8)::gama      !the param used in H-S transformation.
+ complex(kind=8)::gama_perp !the param used in H-S transformation (nearest-neighbor, opposite spins).
+ complex(kind=8)::gama_par  !the param used in H-S transformation (nearest-neighbor, same spins).
  complex(kind=8)::gamad     !gamma for d orbitals
  complex(kind=8)::gamax     !gamma for px orbitals 
  complex(kind=8)::gamay     !gamma for py orbitals
  complex(kind=8)::gamaf     !the gama for the free-projection
  complex(kind=8)::expln_up(2),expln_dn(2) !for the cpmc update
+ complex(kind=8)::explnNNperp_up(2),explnNNperp_dn(2) !for the cpmc update
+ complex(kind=8)::explnNNpar_up(2,2),explnNNpar_dn(2,2) !for the cpmc update
  complex(kind=8)::explnd_up(2),explnd_dn(2) !for the cpmc update
  complex(kind=8)::explnx_up(2),explnx_dn(2) !for the cpmc update
  complex(kind=8)::explny_up(2),explny_dn(2) !for the cpmc update
