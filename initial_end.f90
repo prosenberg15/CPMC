@@ -101,6 +101,10 @@ if(Nspin(2).gt.Nspin(1))then
 endif
 Nzeta=Nspin(1)-Nspin(2)
 
+if((dtype.EQ.'c').and.(dabs(Vperp).gt.1d-6).and.(dabs(Vpar).gt.1d-6)) then
+   if(rank.eq.0) write(*,*) 'Caution : SOC not supported with nearest-neighbor potentials'
+endif
+
 if(dtype.EQ.'d'.or.dtype.EQ.'m') then
   Ntot=Nspin(1)+Nspin(2)
 end if
@@ -112,6 +116,8 @@ read(10,*) crn
 read(10,*) ccoe
 read(10,*) max_crn
 read(10,*) dcp
+read(10,*) nn_decomp_par
+read(10,*) nn_decomp_perp
 read(10,*) kcrn
 read(10,*) bgset
 read(10,*) fw_bk
@@ -247,6 +253,8 @@ use lattice_param
 implicit none
 allocate(hopt(Nhop))
 allocate(sit(Nhop,2))
+allocate(par_bonds(2,Nbonds_par))
+allocate(perp_bonds(2,Nbonds_perp))
 allocate(coor(Nsite,Dimen))
 allocate(Hzero(2*Nsite,2*Nsite))
 allocate(Tmatrix(Nsite,Dimen))
@@ -261,6 +269,8 @@ use lattice_param
 implicit none
 if(allocated(hopt)) deallocate(hopt)
 if(allocated(sit)) deallocate(sit)
+if(allocated(par_bonds)) deallocate(par_bonds)
+if(allocated(perp_bonds)) deallocate(perp_bonds)
 if(allocated(coor)) deallocate(coor)
 if(allocated(Hzero)) deallocate(Hzero)
 if(allocated(Tmatrix)) deallocate(Tmatrix)

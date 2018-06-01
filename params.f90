@@ -23,12 +23,14 @@ implicit none
  integer::Nbands !the number of bands
  integer::Nsite !the number of the whole sites
  integer::Nhop ! the number of the hoping terms need to consider
+ integer::Nbonds_par, Nbonds_perp ! number of bonds connecting nearest-neighbors
  integer::Dimen !the dimension
  integer::Nl(3) !the number of different axis
  real(kind=8)::kbound(3) !the twist boundary condition number
  character(len=1):: boundary ! = o/c   open (y direction) / closed
  complex(kind=8),allocatable::hopt(:) !hopt and sit record the information
  integer,allocatable::sit(:,:)        !of hoping term in different sites
+ integer,allocatable::par_bonds(:,:), perp_bonds(:,:) !bond number --> site numbers array
  integer,allocatable::coor(:,:) ! we label the site, it record the coordinate
  integer,allocatable::Tmatrix(:,:) !Use to store the nearest hopping in different direction.
  complex(kind=8),allocatable::Hzero(:,:)    !2*Nsite,2*Nsite,the Hezo Hamiltonian of the lattice
@@ -68,6 +70,7 @@ implicit none
  real(kind=8)::ccoe !control the release in pop :0.d0 total free wi, 1.d0 wi<phiT|phi>
  integer::max_crn   !Decide the kind of methods.
  character(len=1)::dcp    !The decouple method
+ integer::nn_decomp_par, nn_decomp_perp !decomposition method for nn hopping (1=spin, 2=charge)
  integer::kcrn      !Decide the different kind of free projection
  integer::bgset     !0. mean field 1. dynamic background walker 
  character(len=2)::fw_bk   !Which kind of measure method: FW,BK.

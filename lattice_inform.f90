@@ -34,6 +34,16 @@ real(kind=8)::eps,Vext,x,y
  call allocate_lattice_array()
  call set_lattice_hop()
 
+ if(boundary.eq.'c') then 
+    Nbonds_par  = Nsite
+    Nbonds_perp = Nsite
+ else if(boundary.eq.'o') then
+    Nbonds_par  = Nsite - Nl(2)
+    Nbonds_perp = Nsite - Nl(1)
+ end if
+
+ call bond_to_sites()
+
  Hzero=(0.d0,0.d0)
  do mi=1,Nhop,1
     Hzero(sit(mi,1),sit(mi,2))=Hzero(sit(mi,1),sit(mi,2))+hopt(mi)
@@ -965,6 +975,55 @@ do i=1,Nbravais,1
 end do
 end subroutine set_Tmatrix
 
+
+subroutine bond_to_sites
+use lattice_param
+implicit none
+integer   :: l, row_ind, col_ind
+
+do l = 1, Nbonds_par
+   if(boundary.eq.'c') then
+      !fill parallel bonds array PBC
+      par_bonds(1,l) = l
+      if(mod(l,Nl(1)).eq.0) then
+         par_bonds(2,l) = l+1-Nl(1)
+      else
+         par_bonds(2,l) = l+1
+      end if
+   else if(boundary.eq.'o') then
+      !fill parallel bonds array OBC
+      row_ind = 1
+      do while(l-(Nl(1)-1)*row_ind.gt.0)
+         row_ind = row_ind + 1
+      end do
+      col_ind = l-(Nl(1)-1)*(row_ind-1)
+      par_bonds(1,l) = Nl(1)*(row_ind-1)+col_ind
+      par_bonds(2,l) = Nl(1)*(row_ind-1)+col_ind+1
+   end if
+end do
+
+do l = 1, Nbonds_perp
+   if(boundary.eq.'c') then
+      !fill perpendicular bonds array PBC
+      perp_bonds(1,l) = l
+      if(l.gt.Nl(1)*(Nl(2)-1)) then
+         perp_bonds(2,l) = l-Nl(1)*(Nl(2)-1)
+      else
+         perp_bonds(2,l) = l+Nl(1)
+      end if
+   else if(boundary.eq.'o') then
+      !fill perpendicular bonds array OBC
+      row_ind = 1
+      do while(l-Nl(1)*row_ind.gt.0)
+         row_ind = row_ind + 1
+      end do
+      col_ind = l-Nl(1)*(row_ind-1)
+      perp_bonds(1,l) = Nl(1)*(row_ind-1)+col_ind
+      perp_bonds(2,l) = Nl(1)*(row_ind-1)+col_ind+Nl(1)
+   end if
+end do
+
+end subroutine bond_to_sites
 
 !--------------------------------------------------------
 !It is a bound function use to fit the boundary condtion.
