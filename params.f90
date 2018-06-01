@@ -45,6 +45,7 @@ module model_param
 implicit none
  complex(kind=8):: t1      !Hubbard hopping t1 in nearest direction.
  real(kind=8):: onsitU     !Hubbard U interaction on the same site.
+ real(kind=8):: Vpar, Vperp !nearest-neighbor potential for parallel, perpendicular bonds
  integer:: Ntot            !the tot number of electrons
  character(len=1):: dtype  !for the determinate type: d decouple, c couple.
  integer:: Nspin(2)        !Nup and Ndn

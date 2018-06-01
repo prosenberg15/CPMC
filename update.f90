@@ -249,7 +249,7 @@ character,intent(IN)::bond_label
 complex(kind=8),intent(INOUT)::ovlp(Ntot,Ntot,Dtot)
 integer::j,k,l,q,r,bond_ind
 integer,allocatable::bond_to_sites(:,:)
-integer::nn_decomp
+integer::nn_decomp,Nbonds
 real(kind=8)::avgnqu,avgnqd, avgnru, avgnrd
 real(kind=8)::Vnn
 
@@ -864,7 +864,7 @@ use mpi_serial_param
 implicit none
 integer,intent(IN)::i,j,Nbonds,bond_to_sites(2,Nbonds)
 integer,intent(IN)::nn_decomp
-real,intent(IN)::Vnn
+real(kind=8),intent(IN)::Vnn
 complex(kind=8),intent(INOUT)::inver(Ntot,Ntot,Dtot)
 complex(kind=8)::explr_up,explr_dn,lr_up,lr_dn
 complex(kind=8)::tot_weig
@@ -875,12 +875,10 @@ real(kind=8)::fR(2),prefac
 complex(kind=8)::um(Ntot,2,Dtot),vm(2,Ntot,Dtot)
 !complex(kind=8)::tmp(2,Ntot),tmp_p(Ntot,Ntot),tmp_pp(Ntot,Ntot)
 real(kind=8)::x
-real(kind=8)::Vnn
 real(kind=8)::p(2),Normp
 complex(kind=8)::r(2)
 integer::aux
 integer::k,m,n,q,s
-integer
 
 !Get the update explr_up and explr_dn with update the weight.
 

@@ -66,6 +66,8 @@ if(Nbands.eq.1)then
   endif
   read(10,*) pinndir
   read(10,*) onsitU
+  read(10,*) Vpar
+  read(10,*) Vperp
 elseif(Nbands.eq.3)then
   read(10,*) tpp
   read(10,*) tpd
