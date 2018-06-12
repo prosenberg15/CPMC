@@ -31,9 +31,6 @@ real(kind=8)::eps,Vext,x,y
    call mystop
  end if
 
- call allocate_lattice_array()
- call set_lattice_hop()
-
  if(boundary.eq.'c') then 
     Nbonds_par  = Nsite
     Nbonds_perp = Nsite
@@ -41,6 +38,9 @@ real(kind=8)::eps,Vext,x,y
     Nbonds_par  = Nsite - Nl(2)
     Nbonds_perp = Nsite - Nl(1)
  end if
+
+ call allocate_lattice_array()
+ call set_lattice_hop()
 
  call bond_to_sites()
 

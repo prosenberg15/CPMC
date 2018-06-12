@@ -291,6 +291,8 @@ allocate(exp_halfK(2*Nsite,2*Nsite))
 allocate(exp_mhalfK(2*Nsite,2*Nsite))
 allocate(exp_K(2*Nsite,2*Nsite))
 allocate(ng(Nsite))
+allocate(ng_par(Nbonds_par))
+allocate(ng_perp(Nbonds_perp))
 end subroutine allocate_project_array
 
 
@@ -305,6 +307,8 @@ if(allocated(exp_halfK)) deallocate(exp_halfK)
 if(allocated(exp_mhalfK)) deallocate(exp_mhalfK)
 if(allocated(exp_K)) deallocate(exp_K)
 if(allocated(ng)) deallocate(ng)
+if(allocated(ng_par)) deallocate(ng_par)
+if(allocated(ng_perp)) deallocate(ng_perp)
 end subroutine deallocate_project_array
 
 

@@ -133,6 +133,7 @@ implicit none
  complex(kind=8)::explnx_up(2),explnx_dn(2) !for the cpmc update
  complex(kind=8)::explny_up(2),explny_dn(2) !for the cpmc update
  real(kind=8),allocatable::ng(:) !The back ground for free projection
+ real(kind=8),allocatable::ng_par(:), ng_perp(:) !force-bias for nearest-neighbor interactions
 end module project_param
 
 

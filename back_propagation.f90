@@ -47,6 +47,8 @@ if(crn.GT.0.d0) then
   end do
 end if
 
+!Nbk(1) is number of free projections steps (=0 for CPMC)
+!store fields
 do i_back=Nbk(1)+1,Nstps_fwd,1
    call one_propagation(i_pop,i_GS)
 end do
@@ -204,7 +206,7 @@ complex(kind=8)::phtmp(2*Nsite,Ntot)
 complex(kind=8)::explr_up,explr_dn,lr_up,lr_dn
 real(kind=8)::x
 integer::aux
-integer::j,k,l
+integer::j,k,l,q,s
 
 
 if(Nbands.eq.3)then
@@ -322,7 +324,72 @@ elseif(Nbands.eq.1)then
      end do
    end if
 
- end do 
+end do
+
+!loop over perpendicular bonds
+ do j=1, Nbonds_perp, 1
+     if(nn_decomp_perp.eq.1) then
+        lr_up=x*sqrt(dcmplx(dt*Vperp))
+        lr_up=lr_up-(dt*Vnn/2.d0)+dt*Vperp*ng_perp(j)
+
+        lr_dn=-x*sqrt(dcmplx(dt*Vperp))
+        lr_dn=lr_dn-(dt*Vperp/2.d0)-dt*Vperp*ng_perp(j)
+     else if(nn_decomp_perp.eq.2) then
+        lr_up=x*sqrt(dcmplx(-1.d0*dt*Vperp))
+        lr_up=lr_up+(dt*Vperp/2.d0)*(1.d0-2.d0*ng_perp(j))
+
+        lr_dn=x*sqrt(dcmplx(-1.d0*dt*Vperp))
+        lr_dn=lr_dn+(dt*Vperp/2.d0)*(1.d0-2.d0*ng_perp(j))
+     end if
+     explr_up=exp(lr_up)
+     explr_dn=exp(lr_dn)
+
+     !must update phi here
+     q=perp_bonds(1,j)
+     s=perp_bonds(2,j)
+
+     do k=1,Nspin(1),1
+        phi(q,k,i)=phi(q,k,i)*conjg(explr_up)
+        phi(s,k,i)=phi(s,k,i)*conjg(explr_up)
+     end do
+     do k=Nspin(1)+1,Ntot,1
+        phi(q+Nsite,k,i)=phi(q+Nsite,k,i)*conjg(explr_dn)
+        phi(s+Nsite,k,i)=phi(s+Nsite,k,i)*conjg(explr_dn)
+     end do
+
+  end do
+
+!loop over parallel bonds
+ do j=1, Nbonds_par, 1
+     if(nn_decomp_par.eq.1) then
+        lr_up=x*sqrt(dcmplx(dt*Vpar))
+        lr_up=lr_up-(dt*Vpar/2.d0)+dt*Vpar*ng_par(j)
+
+        lr_dn=-x*sqrt(dcmplx(dt*Vpar))
+        lr_dn=lr_dn-(dt*Vpar/2.d0)-dt*Vpar*ng_par(j)
+     else if(nn_decomp_par.eq.2) then
+        lr_up=x*sqrt(dcmplx(-1.d0*dt*Vpar))
+        lr_up=lr_up+(dt*Vpar/2.d0)*(1.d0-2.d0*ng_par(j))
+
+        lr_dn=x*sqrt(dcmplx(-1.d0*dt*Vpar))
+        lr_dn=lr_dn+(dt*Vpar/2.d0)*(1.d0-2.d0*ng_par(j))
+     end if
+     explr_up=exp(lr_up)
+     explr_dn=exp(lr_dn)
+
+     q=par_bonds(1,j)
+     s=par_bonds(2,j)
+
+     do k=1,Nspin(1),1
+        phi(q,k,i)=phi(q,k,i)*conjg(explr_up)
+        phi(s,k,i)=phi(s,k,i)*conjg(explr_up)
+     end do
+     do k=Nspin(1)+1,Ntot,1
+        phi(q+Nsite,k,i)=phi(q+Nsite,k,i)*conjg(explr_dn)
+        phi(s+Nsite,k,i)=phi(s+Nsite,k,i)*conjg(explr_dn)
+     end do
+
+  end do
 
 endif
 

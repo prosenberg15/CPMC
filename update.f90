@@ -252,6 +252,7 @@ integer,allocatable::bond_to_sites(:,:)
 integer::nn_decomp,Nbonds
 real(kind=8)::avgnqu,avgnqd, avgnru, avgnrd
 real(kind=8)::Vnn
+real(kind=8),allocatable::ng_NN(:)
 
 if(weight(i).le.0.d0) return
 
@@ -261,19 +262,18 @@ if(bond_label.eq.'h') then
    Vnn=Vperp
    allocate(bond_to_sites(2,Nbonds))
    bond_to_sites(:,:)=par_bonds(:,:)
+   allocate(ng_NN(Nbonds))
 else if(bond_label.eq.'v') then
    Nbonds=Nbonds_perp
    nn_decomp=nn_decomp_perp
+   Vnn=Vpar
    allocate(bond_to_sites(2,Nbonds))
    bond_to_sites(:,:)=perp_bonds(:,:)
-   Vnn=Vpar
+   allocate(ng_NN(Nbonds))
 else
    write(*,*) 'bond label must be h or v'
    call mystop
 endif
-
-!Get the inverse of <phiT|phi>
-!if(crn.LT.0.d0) call get_inverse(i,inver(1,1,1))
 
 !determine force bias for V^\alpha * n_j * n_l term
 !set the background
@@ -313,12 +313,17 @@ else if(bgset.eq.1) then !use dynamic field from walker
       end if
       if(nn_decomp.eq.1) then
          !spin decomposition
-         ng(bond_ind)=dble(avgnqu+avgnqd-avgnru-avgnrd)
+         ng_NN(bond_ind)=dble(avgnqu+avgnqd-avgnru-avgnrd)
       else if(nn_decomp.eq.2) then
          !charge decomposition
-         ng(bond_ind)=dble(avgnqu+avgnqd+avgnru+avgnrd)
+         ng_NN(bond_ind)=dble(avgnqu+avgnqd+avgnru+avgnrd)
       end if
    end do
+   if(bond_label.eq.'h') then
+      ng_par(:)  = ng_NN(:)
+   else if (bond_label.eq.'v') then
+      ng_perp(:) = ng_NN(:)
+   endif
 else
    write(*,*) "something is wrong with bgset:",bgset
    call mystop
@@ -332,15 +337,11 @@ if(Nbands.eq.1)then
    end do
 
 elseif(Nbands.eq.3)then
-  do l=1,Nsite,1
-    call single_U_phi_3b(i,l,ovlp(1,1,1))
-    if(weight(i).le.0.d0) exit
-  enddo
-else
-  write(*,*) "something is wrong with Nbands:",Nbands
-  call mystop
+   write(*,*) "nearest-neighbor interactions not supported with multi-band models"
+   call mystop
 endif
 
+deallocate(ng_NN)
 deallocate(bond_to_sites)
 
 end subroutine V_phi
@@ -878,12 +879,16 @@ real(kind=8)::x
 real(kind=8)::p(2),Normp
 complex(kind=8)::r(2)
 integer::aux
-integer::k,m,n,q,s
+integer::k,m,n,q,s,l
 
 !Get the update explr_up and explr_dn with update the weight.
 
 if(nn_decomp.eq.1) then !Use continous spin decomposition
    x=gauss_rndm()
+
+   if(back_pro) then
+      back_store(j,i_back,i)=x
+   end if
 
    lr_up=x*sqrt(dcmplx(dt*Vnn))
    lr_up=lr_up-(dt*Vnn/2.d0)+dt*Vnn*ng(j)
@@ -904,6 +909,9 @@ if(nn_decomp.eq.1) then !Use continous spin decomposition
 else if(nn_decomp.eq.2) then !Use continous charge decomposition
    x=gauss_rndm()
 
+   if(back_pro) then
+      back_store(j,i_back,i)=x
+   end if
    lr_up=x*sqrt(dcmplx(-1.d0*dt*Vnn))
    lr_up=lr_up+(dt*Vnn/2.d0)*(1.d0-2.d0*ng(j))
 
@@ -925,56 +933,35 @@ else
    call mystop
 end if
 
+do l = 1, 2, 1
 
-   if(j.LT.Nsite) then
-     !Get inverse of the overlap
-     do k=1,Dtot,1
+   q = bond_to_sites(l,j)
 
-        !old code
-        !!Get the inv(2,2)
-        !inv(1,1)=one+expln_up(aux)*nj(1,1,k)
-        !inv(1,2)=expln_up(aux)*nj(2,1,k)
-        !inv(2,1)=expln_dn(aux)*nj(1,2,k)
-        !inv(2,2)=one+expln_dn(aux)*nj(2,2,k)
-        !call inv2(inv(1,1))
-        ! 
-        !!Get vm(2,Ntot)
-        !do m=1,Ntot,1
-        !   vm(1,m)=phi(j,m,i)*expln_up(aux)
-        !   vm(2,m)=phi(j+Nsite,m,i)*expln_dn(aux)
-        !end do 
-        ! 
-        !!Get um(Ntot,2)
-        !um(1:Ntot,1)=Conjg(phiT(j,1:Ntot,k))
-        !um(1:Ntot,2)=Conjg(phiT(j+Nsite,1:Ntot,k))
-        !
-        !!tmp=inv.vm
-        !call zgemm('N','N',2,Ntot,2,one,inv(1,1),2,vm(1,1),2,zero,tmp(1,1),2)
-        !!tmp_p=um.tmp
-        !call zgemm('N','N',Ntot,Ntot,2,one,um(1,1),Ntot,tmp(1,1),2,zero,tmp_p(1,1),Ntot)
-        !!tmp_pp=tmp_p.inver
-        !call zgemm('N','N',Ntot,Ntot,Ntot,one,tmp_p(1,1),Ntot,inver(1,1,k),Ntot,zero,tmp_pp(1,1),Ntot)
-        !!inver-inver.tmp_pp
-        !call zcopy(Ntot*Ntot,inver(1,1,k),1,tmp_p(1,1),1)
-        !call zgemm('N','N',Ntot,Ntot,Ntot,(-1.d0,0.d0),tmp_p(1,1),Ntot,tmp_pp(1,1),Ntot,one,inver(1,1,k),Ntot)
+   !Get the um and vm, i is a walker, q, s are basis elements
+   call get_um_vm(i,q,um,vm,inver)
 
-        call update_inverse(i,j,k,nj(1,1,k),aux,um(1,1,k),vm(1,1,k),inver(1,1,k))
-        
-     end do
-   else if(j.eq.Nsite) then
-     !We do not need to update the inverse
+   !get the green's function matrix n_qs(2,2,Dtot)
+   call get_green_matrix(um,vm,nj)
+
+   if(q.LT.Nsite) then
+      !Get inverse of the overlap
+      do k=1,Dtot,1
+         call update_inverse_NN(i,q,k,nj(1,1,k),um(1,1,k),vm(1,1,k),explr_up,explr_dn,inver(1,1,k))       
+      end do
+   else if(q.eq.Nsite) then
+      !We do not need to update the inverse
    else
-     write(*,*) "Something is wrong with the onsit j input:",j
-     call mystop
+      write(*,*) "Something is wrong with the onsit q input:",q
+      call mystop
    end if
 
+   !CHECK BACK-PROPOGATION METHOD FOR CONTINUOUS FIELDS
+   !Store the propogation Ising spin for back propogation.
+   !if(back_pro) then
+   !   back_store(q,i_back,i)=x
+   !end if
 
-
-
-!Store the propogation Ising spin for back propogation.
- if(back_pro) then
-    back_store(j,i_back,i)=x
- end if
+end do
 
  q=bond_to_sites(1,j)
  s=bond_to_sites(2,j)
@@ -1047,7 +1034,6 @@ else if(dtype.EQ.'d') then
 end if
 end subroutine get_um_vm
 
-
 !This subroutine get the green's function matrix from nj=Transpose(vm.um)
 subroutine get_green_matrix(um,vm,nj)
 use param
@@ -1073,7 +1059,6 @@ else if(dtype.EQ.'d') then
   end do
 end if
 end subroutine get_green_matrix
-
 
 !Update the inverse matrix in single U to phi
 subroutine update_inverse_3b(i,j,k,nj,aux,um,vm,inver)
@@ -1219,13 +1204,54 @@ else if(dtype.EQ.'d') then
   call zgeru(Nspin(2),Nspin(2),inv(2,2),tmp_um(Nspin(1)+1,2),1,vm(2,Nspin(1)+1),2,inver(Nspin(1)+1,Nspin(1)+1),Ntot)
 
 
-  
-
   !write(*,*) "here";call mystop
 end if
 
 end subroutine update_inverse
 
+subroutine update_inverse_NN(i,j,k,nj,um,vm,explr_up,explr_dn,inver)
+use param
+use rand_num
+use phi_param
+use model_param
+use lattice_param
+use phiT_param
+use project_param
+use method_param
+implicit none
+integer,intent(IN)::i,j,k
+complex(kind=8),intent(IN)::nj(2,2)
+complex(kind=8),intent(IN)::um(Ntot,2),vm(2,Ntot)
+complex(kind=8),intent(IN)::explr_up,explr_dn
+complex(kind=8),intent(INOUT)::inver(Ntot,Ntot)
+complex(kind=8)::inv(2,2)
+complex(kind=8)::tmp_vm(2,Ntot),tmp_um(Ntot,2)
+integer::m,n
+
+if(dtype.EQ.'d') then
+
+
+  !Get the inv(2,2) with Diag(-expln_up(aux),-expln_dn(aux))
+  inv(1,1)=(-1.d0,0.d0)*explr_up/(one+explr_up*nj(1,1))
+  inv(2,2)=(-1.d0,0.d0)*explr_dn/(one+explr_dn*nj(2,2))
+
+
+  !tmp_um=inver.um
+  call zgemv('N',Nspin(1),Nspin(1),one,inver(1,1),Ntot,um(1,1),1,zero,tmp_um(1,1),1)
+  call zgemv('N',Nspin(2),Nspin(2),one,inver((Nspin(1)+1),(Nspin(1)+1)),Ntot,um((Nspin(1)+1),2),1, &
+           & zero,tmp_um((Nspin(1)+1),2),1)
+
+  !inver-inv(i,i).tmp_um.vm
+  !call zgemm('N','N',Nspin(1),Nspin(1),1,inv(1,1),tmp_um(1,1),Ntot,vm(1,1),2,one,inver(1,1),Ntot)
+  !call zgemm('N','N',Nspin(2),Nspin(2),1,inv(2,2),tmp_um(Nspin(1)+1,2),Ntot,  &
+  !        & vm(2,Nspin(1)+1),2,one,inver(Nspin(1)+1,Nspin(1)+1),Ntot)
+  call zgeru(Nspin(1),Nspin(1),inv(1,1),tmp_um(1,1),1,vm(1,1),2,inver(1,1),Ntot)
+  call zgeru(Nspin(2),Nspin(2),inv(2,2),tmp_um(Nspin(1)+1,2),1,vm(2,Nspin(1)+1),2,inver(Nspin(1)+1,Nspin(1)+1),Ntot)
+
+  !write(*,*) "here";call mystop
+end if
+
+end subroutine update_inverse_NN
 
 
 !test

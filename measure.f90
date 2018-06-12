@@ -737,22 +737,6 @@ do k=1,Dtot,1
    !call deter_overlap(2*Nsite,Ntot,phL(1,1,k),phR(1,1),ovp_local(1,1,k))
    call over_lap_dc(phL(1,1,k),phR(1,1),ovp_local(1,1,k))
 
-!DEB
-!     write(*,*)
-! write(*,*)'**********************************'
-! write(*,*)'ovp_local  '
-! write(*,*)
-! do sitei=1,Ntot
-!   do sitej=1,Ntot
-!     write(*,*)sitei,sitej,ovp_local(sitei,sitej,1)
-!   enddo
-! enddo
-! write(*,*)
-! write(*,*)
-
-
-
-
    !call caldet_dc(ovp_local(1:Ntot,1:Ntot,k),imp_local(k))
    !call inverse_dc(ovp_local(1:Ntot,1:Ntot,k))
    call inverse_d_dc(ovp_local(1:Ntot,1:Ntot,k),imp_local(k))

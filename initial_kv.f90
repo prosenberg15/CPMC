@@ -269,23 +269,6 @@ if(Nbands.eq.1)then
       expln_dn(1)=exp(-1.d0*(dt*onsitU*0.5d0-gama))-one
       expln_dn(2)=exp(-1.d0*(dt*onsitU*0.5d0+gama))-one
 
-      !nearest-neighbor interaction (opposite spins)
-      !explnNNperp_up(1)=exp(-1.d0*(dt*Vperp*0.5d0+gama_perp))-one
-      !explnNNperp_up(2)=exp(-1.d0*(dt*Vperp*0.5d0-gama_perp))-one
-
-      !explnNNperp_dn(1)=exp(-1.d0*(dt*Vperp*0.5d0-gama_perp))-one
-      !explnNNperp_dn(2)=exp(-1.d0*(dt*Vperp*0.5d0+gama_perp))-one
-
-      !nearest-neighbor interaction (like spins)
-      !explnNNpar_up(1,1)=exp(-1.d0*(dt*Vpar*0.5d0+gama_par))-one
-      !explnNNpar_up(1,2)=exp(-1.d0*(dt*Vpar*0.5d0-gama_par))-one
-      !explnNNpar_up(2,1)=exp(-1.d0*(dt*Vpar*0.5d0-gama_par))-one
-      !explnNNpar_up(2,2)=exp(-1.d0*(dt*Vpar*0.5d0+gama_par))-one
-
-      !explnNNpar_dn(1,1)=exp(-1.d0*(dt*Vpar*0.5d0+gama_par))-one
-      !explnNNpar_dn(1,2)=exp(-1.d0*(dt*Vpar*0.5d0-gama_par))-one
-      !explnNNpar_dn(2,1)=exp(-1.d0*(dt*Vpar*0.5d0-gama_par))-one
-      !explnNNpar_dn(2,2)=exp(-1.d0*(dt*Vpar*0.5d0+gama_par))-one
 
    else if(dcp.eq.'C') then
       !1 x=-1; 2 x=1
@@ -295,24 +278,6 @@ if(Nbands.eq.1)then
 
       expln_dn(1)=exp(-1.d0*(dt*onsitU*0.5d0+gama))-one
       expln_dn(2)=exp(-1.d0*(dt*onsitU*0.5d0-gama))-one
-
-      !nearest-neighbor interaction (opposite spins)
-      !explnNNperp_up(1)=exp(-1.d0*(dt*Vperp*0.5d0+gama_perp))-one
-      !explnNNperp_up(2)=exp(-1.d0*(dt*Vperp*0.5d0-gama_perp))-one
-
-      !explnNNperp_dn(1)=exp(-1.d0*(dt*Vperp*0.5d0+gama_perp))-one
-      !explnNNperp_dn(2)=exp(-1.d0*(dt*Vperp*0.5d0-gama_perp))-one
-
-      !nearest-neighbor interaction (like spins)
-      !explnNNpar_up(1,1)=exp(-1.d0*(dt*Vpar*0.5d0+gama_par))-one
-      !explnNNpar_up(2,2)=exp(-1.d0*(dt*Vpar*0.5d0-gama_par))-one
-      !explnNNpar_up(1,1)=exp(-1.d0*(dt*Vpar*0.5d0+gama_par))-one
-      !explnNNpar_up(2,2)=exp(-1.d0*(dt*Vpar*0.5d0-gama_par))-one
-
-      !explnNNpar_dn(1,1)=exp(-1.d0*(dt*Vpar*0.5d0+gama_par))-one
-      !explnNNpar_dn(2,2)=exp(-1.d0*(dt*Vpar*0.5d0-gama_par))-one
-      !explnNNpar_dn(1,1)=exp(-1.d0*(dt*Vpar*0.5d0+gama_par))-one
-      !explnNNpar_dn(2,2)=exp(-1.d0*(dt*Vpar*0.5d0-gama_par))-one
    else
       write(*,*) "Do not know what kind of decouple method."
       call mystop
@@ -415,6 +380,26 @@ if(kcrn.eq.3.or.kcrn.eq.1) then
 else if(kcrn.eq.4.or.kcrn.eq.2) then
   do i=1,Nsite,1
      ng(i)=dble(Ntot)/dble(Nsite)
+  end do
+end if
+
+if(nn_decomp_par.eq.1) then
+  do i=1,Nbonds_par,1
+     ng_par(i)=dble(Nspin(1)-Nspin(2))/dble(Nbonds_par+Nbonds_perp)
+  end do
+else if(nn_decomp_par.eq.2) then
+  do i=1,Nsite,1
+     ng_par(i)=dble(Ntot)/dble(Nbonds_par+Nbonds_perp)
+  end do
+end if
+
+if(nn_decomp_perp.eq.1) then
+  do i=1,Nbonds_perp,1
+     ng_perp(i)=dble(Nspin(1)-Nspin(2))/dble(Nbonds_par+Nbonds_perp)
+  end do
+else if(nn_decomp_perp.eq.2) then
+  do i=1,Nsite,1
+     ng_perp(i)=dble(Ntot)/dble(Nbonds_par+Nbonds_perp)
   end do
 end if
 
